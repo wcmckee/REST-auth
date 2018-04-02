@@ -7,6 +7,22 @@ from passlib.apps import custom_app_context as pwd_context
 from itsdangerous import (TimedJSONWebSignatureSerializer
                           as Serializer, BadSignature, SignatureExpired)
 
+import requests
+import shutil
+import os
+import getpass
+from urllib.parse import urlparse
+import PIL
+import json
+from PIL import ImageDraw, ImageFont
+from PIL import Image
+from PIL import ImageDraw
+from flask_bootstrap import Bootstrap
+import tweepy
+from flask import jsonify
+import arrow
+import glob
+myusr = getpass.getuser()
 # initialization
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'the quick brown fox jumps over the lazy dog'
@@ -91,13 +107,73 @@ def get_auth_token():
     return jsonify({'token': token.decode('ascii'), 'duration': 600})
 
 
-@app.route('/api/resource')
+@app.route('/api/creatememe')
 @auth.login_required
 def get_resource():
-    return jsonify({'data': 'Hello, %s!' % g.user.username})
+    memename = request.json.get('memename')
+
+    toptext = request.json.get('toptext')
+    toptext = toptext.upper()
+
+    bottomtext = request.json.get('bottomtext')
+    bottomtext = bottomtext.upper()
+    user= request.json.get('user')
+
+    timnow = arrow.now()
+    timstr = timnow.timestamp
+
+    galdirdir = '/home/{}/artctrl/meme/galleries/{}/'.format(myusr, user)
+
+
+
+    #with open('/home/{}/rbnz-tech-backup/artctrl/meme/galleries/default')
+
+    img = Image.open('/home/{}/artctrl/meme/galleries/default/{}.jpg'.format(myusr, memename))
+
+    imageSize = img.size
+
+    # find biggest font size th90t works
+    fontSize = int(imageSize[1]/5)
+    font = ImageFont.truetype("/home/{}/Downloads/impact.ttf".format(myusr), fontSize)
+    topTextSize = font.getsize(toptext)
+    bottomTextSize = font.getsize(bottomtext)
+
+    while topTextSize[0] > imageSize[0]-20 or bottomTextSize[0] > imageSize[0]-20:
+        fontSize = fontSize - 1
+        font = ImageFont.truetype("/home/{}/Downloads/impact.ttf".format(myusr), fontSize)
+        topTextSize = font.getsize(toptext)
+        bottomTextSize = font.getsize(bottomtext)
+
+    # find top centered position for top text
+    topTextPositionX = (imageSize[0]/2) - (topTextSize[0]/2)
+    topTextPositionY = 0
+    topTextPosition = (topTextPositionX, topTextPositionY)
+
+    # find bottom centered position for bottom text
+    bottomTextPositionX = (imageSize[0]/2) - (bottomTextSize[0]/2)
+    bottomTextPositionY = imageSize[1] - bottomTextSize[1] -10
+    bottomTextPosition = (bottomTextPositionX, bottomTextPositionY)
+
+    draw = ImageDraw.Draw(img)
+
+    outlineRange = int(fontSize/15)
+    for x in range(-outlineRange, outlineRange+1):
+        for y in range(-outlineRange, outlineRange+1):
+                draw.text((topTextPosition[0]+x, topTextPosition[1]+y), toptext, (0,0,0), font=font)
+                draw.text((bottomTextPosition[0]+x, bottomTextPosition[1]+y), bottomtext, (0,0,0), font=font)
+
+        draw.text(topTextPosition, toptext, (255,255,255), font=font)
+        draw.text(bottomTextPosition, bottomtext, (255,255,255), font=font)
+        img.save('/home/{}/artctrl/meme/galleries/{}/{}-{}.jpg'.format(myusr, user, memename, timstr))
+
+        #img.save("/home/{}/memetest/galleries/{}/{}.jpg".format(myusr, usrfolz, gtm['id']))
+
+
+    memedict = dict({'meme' : memename, 'toptext' : toptext.upper(), 'bottomtext' : bottomtext.upper(), 'imagepath' : '/home/{}/rbnz-tech-backup/artctrl/meme/galleries/{}/{}-{}.jpg'.format(myusr, user, memename, timstr)})
+    return(jsonify(memedict))
 
 
 if __name__ == '__main__':
     if not os.path.exists('db.sqlite'):
         db.create_all()
-    app.run(debug=True)
+    app.run(port=4321, host='0.0.0.0')
